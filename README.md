@@ -111,6 +111,6 @@ pass/fail list.
 The Obsidian insertion feature builds on
 [obsidian-advanced-uri](https://github.com/Vinzent03/obsidian-advanced-uri) by Vinzent, under its original
 licence. This app's Obsidian support is a locally modified fork of that plugin, installed as
-`[advanced-uri-local](https://github.com/Virility/obsidian-advanced-uri)` so it can sit alongside the original.
+[advanced-uri-local](https://github.com/Virility/obsidian-advanced-uri) so it can sit alongside the original.
 
 
