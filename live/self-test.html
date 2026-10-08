@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bookmark Library — self-tests</title>
+<style>
+    :root { color-scheme: light dark; }
+    body { font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 28px clamp(16px, 4vw, 48px) 64px; background: #f5f6f8; color: #1d2433; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p.lede { color: #5a6274; margin: 0 0 18px; max-width: 90ch; }
+    .summary { font-size: 15px; font-weight: 650; padding: 12px 14px; border-radius: 10px; background: #fff; border: 1px solid #dcdfe6; margin-bottom: 14px; }
+    .summary.is-bad { border-color: #d9352b; color: #a5211a; }
+    .summary.is-good { border-color: #2e7d32; color: #1f6124; }
+    table { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid #dcdfe6; border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #eceef2; font-size: 13px; vertical-align: top; }
+    th { background: #f0f2f5; font-weight: 650; }
+    tr.is-fail td { background: #fdf3f2; }
+    td.mark { width: 64px; font-weight: 700; }
+    td.mark.ok { color: #1f6124; }
+    td.mark.bad { color: #a5211a; }
+    td.mark.skip { color: #7a6a2f; }
+    h2 { font-size: 14px; margin: 22px 0 6px; color: #3b4252; }
+    code { background: #eceef2; border-radius: 4px; padding: 0 4px; }
+    button { font: inherit; padding: 7px 12px; border-radius: 9px; border: 1px solid #c9cdd6; background: #fff; cursor: pointer; }
+    .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<h1>Self-tests</h1>
+<p class="lede">Pure-logic checks for the URL cleaning rules, the rule engine, the Netscape reader and writer, the title-cleanup rules and the URL keys. They run in the app too (Actions → Self-tests) — these are the same tests, without needing a library loaded.</p>
+<div class="toolbar">
+    <button type="button" id="rerun">Run again</button>
+    <button type="button" id="copy">Copy results</button>
+    <span id="stamp" class="lede"></span>
+</div>
+<div id="summary" class="summary">Running…</div>
+<div id="results"></div>
+<script src="js/bookmark-lib.js"></script>
+<script src="js/dupe-cleanup.js"></script>
+<script src="js/repairs.js"></script>
+<script src="js/self-tests.js"></script>
+<script src="js/self-test-run.js"></script>
+</body>
+</html>

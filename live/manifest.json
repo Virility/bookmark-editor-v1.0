@@ -1,0 +1,58 @@
+{
+  "manifest_version": 2,
+  "name": "Bookmark Library",
+  "version": "1.0.0",
+  "description": "Edit, analyze, and repair the live Firefox or Chrome bookmark library.",
+  "permissions": [
+    "bookmarks",
+    "tabs",
+    "sessions",
+    "storage",
+    "alarms",
+    "menus",
+    "contextMenus",
+    "clipboardWrite",
+    "notifications",
+    "<all_urls>"
+  ],
+  "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self';",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bookmark-library@local",
+      "strict_min_version": "115.0"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "browser_action": {
+    "default_title": "Bookmark Library",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    }
+  },
+  "omnibox": {
+    "keyword": "bm"
+  },
+  "sidebar_action": {
+    "default_title": "Bookmark Library",
+    "default_panel": "bookmark-editor-v1.0.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "scripts": [
+      "js/bookmark-lib.js",
+      "js/background.js"
+    ]
+  }
+}

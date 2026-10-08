@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library - Bookmark Editor Suite v1.0</title>
+    <link rel="stylesheet" href="bookmark-editor-v1.0.css?v=goal195v1">
+</head>
+<body>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="brand"><span class="brand-mark">🔖</span> Bookmark Library</div>
+        <div class="toolbar-group dropdown">
+            Import and Backup <span>▾</span>
+            <div class="dropdown-content">
+                <div class="menu-group">Import and backup</div>
+                <a href="#" data-call="pickJsonImport">Import Bookmarks from JSON...</a>
+                <a href="#" data-call="exportBookmarks">Export Bookmarks to JSON...</a>
+                <a href="#" data-call="exportLibraryAsHtml">Export all bookmarks as HTML...</a>
+                <a href="#" data-call="pickHtmlImport">Import bookmarks from HTML...</a>
+                <a href="#" data-call="pickJsonMerge">Merge Bookmarks from JSON...</a>
+                <label class="dropdown-field">Merge policy
+                    <select id="setting-merge-policy" data-call="applyEditorSetting" data-arg="mergePolicy">
+                        <option value="skip">Skip URLs already here</option>
+                        <option value="prefer-newer">Newer title wins</option>
+                        <option value="overwrite">Overwrite titles</option>
+                        <option value="keep-both">Keep both copies</option>
+                    </select>
+                </label>
+                <div class="dropdown-rule"></div>
+                <div class="menu-group">Settings</div>
+                <a href="#" data-call="exportEditorSettings">Export settings as JSON...</a>
+                <a href="#" data-call="pickSettingsImport">Import settings from JSON...</a>
+                <div class="dropdown-rule"></div>
+                <div class="menu-group">Tools</div>
+                <a href="#" data-call="openTrashDialog">Recently deleted...</a>
+                <a href="#" data-call="openSelfTestPage">Open the self-test page</a>
+                <a href="#" data-call="pickJsonCompare">Compare another JSON...</a>
+                <a href="#" data-call="exportStatsCsv">Export stats CSV...</a>
+            </div>
+        </div>
+        <input type="file" id="file-upload" style="display: none" accept=".json" data-call="importBookmarks">
+        <input type="file" id="compare-upload" style="display: none" accept=".json" data-call="compareBookmarkFile">
+        <button class="action-btn" type="button" id="theme-toggle" data-call="toggleDarkTheme">Dark</button>
+        
+        <div class="status-indicator">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Ready (No file loaded)</span>
+            <span id="status-live" class="visually-hidden" role="status" aria-live="polite"></span>
+        </div>
+        <button class="action-btn" type="button" id="undo-last" data-call="undoLastChange" disabled>Undo</button>
+        <button class="action-btn" type="button" id="redo-last" data-call="redoLastChange" disabled>Redo</button>
+        <button class="ghost-btn" type="button" id="undo-history" data-call="toggleUndoHistory" title="Undo and redo steps from this session">History</button>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div id="library-changed-banner" class="library-banner" hidden role="status">
+        <span id="library-changed-text"></span>
+        <button type="button" class="ghost-btn" data-call="reloadFromLibraryBanner">Reload from this browser</button>
+        <button type="button" class="ghost-btn" data-call="dismissLibraryChanged">Dismiss</button>
+    </div>
+    <div class="tabs-container">
+        <button class="tab-btn" type="button" data-view="tabs-view">Open Tabs</button>
+        <button class="tab-btn active" type="button" data-view="bookmarks-view">Bookmarks</button>
+        <button class="tab-btn" type="button" data-view="stats-view">Statistics</button>
+        <button class="tab-btn" type="button" data-view="actions-view">Actions</button>
+        <button class="tab-btn" type="button" data-view="affected-view">Affected Log</button>
+        <button class="tab-btn" type="button" data-view="settings-view">Settings</button>
+        <button class="tab-btn" type="button" data-view="docs-view">Documentation</button>
+        <button class="tab-btn tab-shortcut" id="tab-remove-empty" hidden type="button" data-call="showRemoveEmptyFolders" title="Remove every empty folder in the library (opens Actions → Duplicates)">Remove All empty folders</button>
+    </div>
+
+    <!-- Main Container views -->
+    
+    <!-- View 1: Bookmarks Editor -->
+    <div id="bookmarks-view" class="view-pane active">
+        <!-- Sidebar Tree -->
+        <!-- Sidebar Tree (filter above the tree, both inside one column) -->
+        <div class="sidebar-column">
+    <div class="tree-filter-row">
+                        <input id="tree-filter" type="search" placeholder="Filter the folder tree (all levels)" data-call="applyTreeFilter">
+                        <button type="button" class="ghost-btn" id="tree-filter-clear" data-call="clearTreeFilter" hidden>Clear</button>
+                    </div>
+                    <div class="sidebar" id="sidebar"></div>
+        </div>
+        <div class="library-splitter" id="library-splitter" role="separator" aria-orientation="vertical" aria-label="Resize folder tree" aria-controls="sidebar content" tabindex="0"></div>
+        <div class="content" id="content">
+            <div class="page-head">
+                <div>
+                    <div class="folder-heading">
+                        <div class="folder-title-row">
+                            <h1 id="folder-title">Your bookmarks</h1>
+                            <button type="button" id="folder-remove-empty" class="folder-empty-btn" hidden data-call="showRemoveEmptyFoldersInFolder" title="Remove the empty folders inside this folder only">Remove empty folders</button>
+                            <button type="button" id="folder-subreddit-toggle" class="subreddit-toggle" hidden aria-expanded="false" aria-controls="folder-subreddits" title="Show subreddit chips">/r</button>
+                        </div>
+                        <button type="button" id="folder-up" class="folder-up" hidden>Up</button>
+                        <div id="folder-subreddits" class="folder-subreddits"></div>
+                    </div>
+                    <p id="folder-meta">Import a bookmark JSON file to explore its folders.</p>
+                </div>
+                <div class="library-tools">
+                    <div class="library-tool-tabs" role="tablist" aria-label="Folder tools">
+                        <button type="button" class="library-tool-tab active" data-library-tool="search" data-call="switchLibraryTool" data-arg="search">Search</button>
+                        <button type="button" class="library-tool-tab" data-library-tool="actions" data-call="switchLibraryTool" data-arg="actions">Actions</button>
+                    </div>
+                    <div id="library-tool-search" class="search">
+                        <label class="search-recursive"><input id="bookmark-search-recursive" type="checkbox" checked data-call="filterFolderContents"> Recursive search</label>
+                        <label class="search-recursive"><input id="bookmark-search-everywhere" type="checkbox" data-call="filterFolderContents"> Search everywhere</label>
+                        <button type="button" class="ghost-btn" id="sort-reset" data-call="resetLibrarySort" hidden>Reset sort</button>
+                        <button type="button" class="ghost-btn" id="column-reset" data-call="resetColumnWidths" hidden>Reset columns</button>
+                        <div class="search-field" id="search-field"><input id="bookmark-search" type="search" placeholder="Search, or use domain:  title:  added:&gt;2024-01  is:tracked"><button type="button" class="search-clear" id="search-clear" data-call="clearSearchFilters" title="Clear the search and all the filters" aria-label="Clear search and filters" hidden>×</button></div>
+                        <div id="search-operators" class="operator-panel" hidden role="dialog" aria-label="Search filters"></div>
+                    </div>
+                    <div id="library-tool-actions" class="library-tool-actions" hidden>
+                        <p class="library-tool-help">Uses the current folder search results (including Recursive search when it is on).</p>
+                        <button type="button" class="ghost-btn" id="search-send-obsidian" data-call="sendFolderSearchToObsidian" data-arg="keep">Send search results to Obsidian</button>
+                        <button type="button" class="ghost-btn" id="search-send-obsidian-delete" data-call="sendFolderSearchToObsidian" data-arg="delete">Send search results to Obsidian and delete</button>
+                        <button type="button" class="ghost-btn" id="search-move-into-folder" data-call="openMoveSearchFolderDialog">Move search bookmarks into a folder…</button>
+                    </div>
+                </div>
+            </div>
+            <table id="bookmarks-table">
+                <thead>
+                    <tr>
+                        <th id="bookmark-sort-name" class="sort-col" style="width: 34%">Name</th>
+                        <th id="bookmark-sort-location" class="sort-col" style="width: 34%">Location</th>
+                        <th id="bookmark-sort-added" class="sort-col" style="width: 16%">Added</th>
+                        <th style="width: 16%">Tags</th>
+                    </tr>
+                </thead>
+                <tbody id="bookmarks-body"></tbody>
+            </table>
+            <div id="folder-collect-row" class="folder-collect-row" hidden>
+                <span class="status-collect-wrap">
+                    <button type="button" id="status-collect-moves" class="status-collect-btn" disabled data-call="runManualMoveToOther" aria-describedby="status-collect-tip">Move bookmarks here</button>
+                    <span id="status-collect-tip" class="status-collect-tip" role="tooltip"></span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- View: Domain statistics -->
+    <div id="stats-view" class="view-pane">
+        <div class="stats-page">
+            <div class="page-head">
+                <div>
+                    <h1>Link statistics</h1>
+                    <p id="stats-meta">Import a bookmark JSON file to group links by parent domain.</p>
+                </div>
+                <div class="search">
+                    <input id="stats-search" type="search" placeholder="Filter the current view" data-call="filterStatistics">
+                </div>
+            </div>
+            <div class="stats-toolbar">
+                <label>Sort
+                    <select id="stats-sort" data-call="paintStatistics">
+                        <option value="count">Most links</option>
+                        <option value="rdnn">Reverse domain</option>
+                        <option value="recent">Most recently added</option>
+                        <option value="oldest">Oldest first added</option>
+                        <option value="rate">Fastest recent (day)</option>
+                    </select>
+                </label>
+                <label>Quick-add gap
+                    <select id="stats-burst-gap" data-call="rebuildStatistics">
+                        <option value="30000">30 seconds</option>
+                        <option value="60000">1 minute</option>
+                        <option value="120000" selected>2 minutes</option>
+                        <option value="300000">5 minutes</option>
+                        <option value="900000">15 minutes</option>
+                        <option value="3600000">1 hour</option>
+                    </select>
+                </label>
+                <label>Min session size
+                    <select id="stats-burst-min" data-call="rebuildStatistics">
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </label>
+                <button class="action-btn" type="button" data-call="rebuildStatistics">Refresh</button>
+                <button class="action-btn" type="button" data-call="exportStatsCsv">CSV</button>
+            </div>
+            <div id="stats-summary" class="stats-summary"></div>
+            <div id="stats-body" class="stats-body"></div>
+        </div>
+    </div>
+
+    <!-- View 2: Actions & Topic Children -->
+    <div id="actions-view" class="view-pane">
+        <div class="actions-sidebar">
+            <button class="child-tab-btn active" type="button" data-child="yt-actions">YouTube</button>
+            <button class="child-tab-btn" type="button" data-child="hn-actions">Hacker News</button>
+            <button class="child-tab-btn" type="button" data-child="reddit-actions">Reddit</button>
+            <button class="child-tab-btn" type="button" data-child="meta-actions">Meta</button>
+            <button class="child-tab-btn" type="button" data-child="general-repairs-actions">General repairs</button>
+            <button class="child-tab-btn" type="button" data-child="dupe-cleanup-actions">Duplicates</button>
+            <button class="child-tab-btn" type="button" data-child="nearby-actions">Nearby Bookmarks</button>
+            <button class="child-tab-btn" type="button" data-child="link-check-actions">Link check</button>
+            <button class="child-tab-btn" type="button" data-child="script-actions">Script Lab</button>
+        </div>
+        <div class="actions-content">
+            
+            <!-- YouTube Topic -->
+            <div id="yt-actions" class="child-pane active">
+                <h2>YouTube Tools</h2>
+                <div class="action-subtext">
+                    <strong>Affected patterns:</strong> 
+                    <code>youtube.com/watch?v=</code>, <code>m.youtube.com</code>, <code>youtu.be</code>, <code>/embed/</code>. Shorts are excluded.
+                </div>
+
+                <!-- Duplicate Links -->
+                                    <div class="action-card" id="selftest-card">
+                        <div class="action-card-header">
+                            <span>Self-tests</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="runSelfTestsFromCard">Run self-tests</button>
+                                <button class="ghost-btn" type="button" data-call="copySelfTestReport">Copy report</button>
+                                <button class="ghost-btn" type="button" data-call="openSelfTestPage">Open the page</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            The pure logic this app relies on: URL cleaning and the rule engine, the Netscape reader and writer, the title-cleanup rules and the three URL keys. No library is needed, nothing is changed, and the same suite runs standalone in <code>self-test.html</code>.
+                            <div id="repairs-selftest-results"><p>Run the tests to see every check.</p></div>
+                        </div>
+                    </div>
+                    <div class="action-card" id="results-card">
+                        <div class="action-card-header">
+                            <span>Results and reports</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="clearRepairResults">Clear</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            JSON compares, folder rankings and domain health render here so nothing has to fall back to a pop-up.
+                            <div id="repairs-results"><p>Compare a JSON file (Import and Backup → Compare), or run one of the reports on the Statistics tab.</p></div>
+                            <div class="rules-buttons">
+                                <button type="button" class="ghost-btn" data-call="sendReportToObsidian" data-arg="health">Send health report</button>
+                                <button type="button" class="ghost-btn" data-call="sendReportToObsidian" data-arg="folders">Send folder sizes</button>
+                                <button type="button" class="ghost-btn" data-call="sendReportToObsidian" data-arg="domains">Send domain health</button>
+                                <button type="button" class="ghost-btn" data-call="sendReportToObsidian" data-arg="folder">Send this folder’s report</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="action-card" id="problems-card">
+                        <div class="action-card-header">
+                            <span>Validate library</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="scanLibraryProblems">Scan</button>
+                                <button class="action-btn" type="button" data-apply="libproblems" data-apply-label="Fix checked" disabled data-call="applyBulk" data-arg="libproblems">Fix checked</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            Structural problems the other scans do not cover: bookmarks with no title, bookmarks whose URL is not a page (javascript:, data:, about:), sibling folders sharing a name, and folders whose date is older than their own newest child. Fixes are previewed and applied as one undo step.
+                            <div id="repairs-problems-results"><p>Scan to check the library's structure.</p></div>
+                        </div>
+                    </div>
+                    <div class="action-card">
+                        <div class="action-card-header">
+                            <span>Never opened</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="scanUnusedBookmarks">Scan</button>
+                                <button class="action-btn" type="button" data-apply="unused" data-apply-label="Delete" disabled data-call="applyBulk" data-arg="unused">Delete</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            Bookmarks the browser has no recorded use for, or whose last use is older than the cut-off. Firefox only reports a last-used date for some bookmarks, so “never recorded” is a hint rather than proof; the delete preview still honours protected folders.
+                            <div class="replace-form">
+                                <label>Older than
+                                    <select id="repairs-unused-months" aria-label="Age cut-off in months">
+                                        <option value="3">3 months</option>
+                                        <option value="6">6 months</option>
+                                        <option value="12" selected>12 months</option>
+                                        <option value="24">2 years</option>
+                                        <option value="60">5 years</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div id="repairs-unused-results"><p>Scan to list bookmarks with no recorded use.</p></div>
+                        </div>
+                    </div>
+                    <div class="action-card" id="notes-card">
+                        <div class="action-card-header">
+                            <span>Bookmark notes</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="scanOrphanNotes">Scan</button>
+                                <button class="action-btn" type="button" data-call="deleteAllOrphanNotes">Delete orphans</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            Notes are kept by the app in this browser and keyed by URL: Firefox's API cannot store descriptions. Editing a URL moves its note along. This scan finds notes whose bookmark is gone.
+                            <div id="repairs-orphannotes-results"><p>Scan to list stored notes that no longer match a bookmark.</p></div>
+                        </div>
+                    </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Duplicate Links (Same ID)</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" data-call="runYtDuplicates">Scan Duplicates</button>
+                            <button class="action-btn" type="button" data-apply="yt-dupes" data-apply-label="Delete" disabled data-call="applyBulk" data-arg="yt-dupes">Delete</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body" id="yt-dupes-results">
+                        <p style="color:#777">Click scan to find duplicates. Every copy except the oldest is checked; Delete removes the checked copies.</p>
+                    </div>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Normalize &amp; deduplicate YouTube</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanYouTubeNormalize">Scan</button>
+                            <button class="action-btn" type="button" data-apply="yt-normalize" data-apply-label="Clean" disabled data-call="applyBulk" data-arg="yt-normalize">Clean</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Converts eligible YouTube video bookmarks to <code>https://www.youtube.com/watch?v=VIDEO_ID</code>, then removes duplicates by video ID. Shorts are left unchanged. The bookmark with the oldest <code>dateAdded</code> is retained; the title comparison ignores a trailing <code> - YouTube</code>. Scan first, then apply.
+                        <div id="yt-normalize-results"></div>
+                    </div>
+                </div>
+
+                <!-- Unsame Titles -->
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Unsame Titles (Same ID, Different Bookmark Title)</span>
+                        <button class="action-btn" data-call="runYtUnsameTitles">Scan Unsame Titles</button>
+                    </div>
+                    <div class="action-card-body" id="yt-unsame-results">
+                        <p style="color:#777">Find bookmarks that point to the same video but have differing titles.</p>
+                    </div>
+                </div>
+
+                <!-- Missing Suffix -->
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Missing " - YouTube" Suffix</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanYtSuffix">Scan</button>
+                            <button class="action-btn" type="button" data-apply="yt-suffix" data-apply-label="Append" disabled data-call="applyBulk" data-arg="yt-suffix">Append</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Automatically appends " - YouTube" to video bookmarks that don't end with it. Scan first, then apply.
+                        <div id="yt-suffix-results"></div>
+                    </div>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Malformed watch-page titles</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanMalformedYtTitles">Scan</button>
+                            <button class="action-btn" type="button" data-apply="yt-malformed" data-apply-label="Clean" disabled data-call="applyBulk" data-arg="yt-malformed">Clean</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        <p>Finds titles scraped from the YouTube watch UI: duration, mashed channel, view count, “ago”, Live, Playlist (), Mix (50+), then <code> - YouTube</code>. Edit the cleaned title in the table before Clean.</p>
+                        <div id="yt-malformed-results"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hacker News Topic -->
+            <div id="hn-actions" class="child-pane">
+                <h2>Hacker News Tools</h2>
+                <div class="action-subtext">
+                    <strong>Affected patterns:</strong> 
+                    <code>hcker.news/?comments=</code>
+                </div>
+                
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Convert to Native YCombinator URLs</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanHackerNewsLinks">Scan</button>
+                            <button class="action-btn" type="button" data-apply="hn" data-apply-label="Convert" disabled data-call="applyBulk" data-arg="hn">Convert</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Transforms URLs to <code>news.ycombinator.com/item?id=...</code> and cleans titles. Scan first, then apply.
+                        <div id="hn-results"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="reddit-actions" class="child-pane">
+                <h2>Reddit Tools</h2>
+                <div class="action-subtext">
+                    Files bookmarks sitting in a <code>Reddit Links</code> folder into child folders named after the subreddit only (<code>news</code>, <code>programming</code> — no slash). Subreddit is read from <code>/r/name</code> in the URL, or from a title like <code>Post title : news</code>.
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Sort Reddit Links into subreddit folders</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanRedditSubredditFolders">Scan</button>
+                            <button class="action-btn" type="button" data-apply="reddit-v1" data-apply-label="Move" disabled data-call="applyBulk" data-arg="reddit-v1">Move into folders</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Only moves items that are not already in a matching <code>subreddit</code> folder (legacy <code>r/…</code> names still count as already filed). Creates missing folders under <code>Reddit Links</code>. Items without a detectable subreddit are left in place.
+                        <div id="reddit-file-results">
+                            <p>Scan to preview how many bookmarks would move.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Sort Reddit Links into subreddit folders v2 (experimental)</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanRedditToolbarFolders">Scan</button>
+                            <button class="action-btn" type="button" data-apply="reddit-v2" data-apply-label="Move" disabled data-call="applyBulk" data-arg="reddit-v2">Move into folders</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Reads top-level <code>Bookmarks Toolbar</code> folders named <code>description - sub1 sub2 …</code>. Each space-separated name is a subreddit. <strong>First</strong> files loose matching bookmarks under <code>Other Bookmarks → Reddit Links</code> into a subreddit-named folder there (creates the folder only if missing). <strong>Then</strong> nests that original subreddit folder under the matching toolbar group (a folder move, so it leaves Reddit Links). Bookmarks stay inside the subreddit folder — they are not flattened into the group. If the group already has that folder, bookmarks are merged into it and the empty source is removed only after. <strong>Finally</strong> sorts leftover folders under Reddit Links A→Z (case-insensitive); remaining loose links keep their order after the folders. Unlisted subreddits stay in Reddit Links. If a name appears in two categories, the first toolbar folder wins.
+                        <div id="reddit-file-v2-results">
+                            <p>Scan v2 to preview toolbar categories and Reddit Links moves.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Same post, different comment chains</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanRedditCommentChains">Scan</button>
+                            <button class="action-btn" type="button" data-apply="comment-keep" data-apply-label="Keep oldest" disabled data-call="applyBulk" data-arg="comment-keep">Keep oldest</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Finds Reddit bookmarks that share a post id but different comment permalinks. Apply keeps the oldest (post-only wins ties) and removes the extras.
+                        <div id="reddit-comment-results">
+                            <p>Scan to list posts that have more than one comment chain.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="meta-actions" class="child-pane">
+                <h2>Meta Tools</h2>
+                <div class="action-subtext">
+                    <strong>Affected patterns:</strong>
+                    <code>facebook.com</code>, <code>m.facebook.com</code>, <code>fb.com</code>, <code>fb.watch</code>,
+                    <code>instagram.com</code>, <code>instagr.am</code>.
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Notification count in title</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanMetaNotificationTitles">Scan</button>
+                            <button class="action-btn" type="button" data-apply="meta-notif" data-apply-label="Clean" disabled data-call="applyBulk" data-arg="meta-notif">Clean</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Strips a leading unread-count prefix from Facebook and Instagram bookmark titles. Examples: <code>(20+) Video | Facebook</code> → <code>Video | Facebook</code>, <code>(14) Entrepreneurs for Nepal | Facebook</code> → <code>Entrepreneurs for Nepal | Facebook</code>, <code>(3) Instagram</code> → <code>Instagram</code>. Scan first, then apply.
+                        <div id="meta-notif-results"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="general-repairs-actions" class="child-pane">
+                <h2>General repairs</h2>
+                <div class="action-subtext">
+                    Fixes import damage in a bookmark JSON file: Unix-second <code>dateAdded</code> (Firefox shows <code>12/31/69</code>), broken titles/URLs, short links, tracking params, and folder merges. Scan first, then apply. Export JSON to keep the result.
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Replace Unix-second dateAdded with lastModified</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanEpochDates">Scan</button>
+                            <button class="action-btn" type="button" data-apply="epoch" data-apply-label="Repair" disabled data-call="applyBulk" data-arg="epoch">Repair</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Treats missing, zero, <code>NaN</code>, Netscape Unix-second <code>ADD_DATE</code> (raw value &lt; 1e11, e.g. <code>2011000000</code>), and dates before 2 Jan 1970 as broken. Repair copies a valid <code>lastModified</code> onto <code>dateAdded</code> (does not keep the Unix-second wall-clock).                         If <code>lastModified</code> is missing or also malformed, copies <code>dateLastUsed</code> when valid, otherwise sets now.
+                        <div id="repairs-epoch-results"><p>Scan to preview dateAdded before and after.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Short-link expander (offline)</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanShortLinks">Scan</button>
+                            <button class="action-btn" type="button" data-apply="short" data-apply-label="Expand" disabled data-call="applyBulk" data-arg="short">Expand</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Rewrites <code>youtu.be</code>, YouTube embed/mobile, <code>redd.it</code>, and <code>*.m.wikipedia.org</code> to canonical hosts with no network. <code>t.co</code> and <code>amzn.to</code> cannot be expanded offline and are listed only.
+                        <div id="repairs-short-results"><p>Scan to preview each URL before and after.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Tracking-parameter stripper</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanTrackingParams">Scan</button>
+                            <button class="action-btn" type="button" data-apply="tracking" data-apply-label="Strip" disabled data-call="applyBulk" data-arg="tracking">Strip</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Drops <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, YouTube <code>si=</code>, and similar trackers. Scan lists every parameter that would be removed.
+                        <div id="repairs-tracking-results"><p>Scan to preview each URL and the parameters that would be stripped.</p></div>
+                    </div>
+                </div>
+
+                                    <div class="action-card">
+                        <div class="action-card-header">
+                            <span>Title cleanup</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="scanTitleCleanup">Scan</button>
+                                <button class="action-btn" type="button" data-apply="title-cleanup" data-apply-label="Clean" disabled data-call="applyBulk" data-arg="title-cleanup">Clean</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            Site suffixes are stripped only when the text after the separator names that link's own host or parent domain; whitespace collapses and edge separators come off; ALL CAPS longer than 12 characters folds to sentence case; emoji runs come off only at the very start or end, never down to an empty title.
+                            <div class="replace-form">
+                                <label class="replace-case"><input type="checkbox" id="repairs-title-suffix" data-call="scanTitleCleanup" checked> Strip " &lt;sep&gt; Site" suffix</label>
+                                <label class="replace-case"><input type="checkbox" id="repairs-title-space" data-call="scanTitleCleanup" checked> Whitespace and separators</label>
+                                <label class="replace-case"><input type="checkbox" id="repairs-title-caps" data-call="scanTitleCleanup" checked> ALL CAPS to sentence case</label>
+                                <label class="replace-case"><input type="checkbox" id="repairs-title-emoji" data-call="scanTitleCleanup" checked> Edge emoji</label>
+                            </div>
+                            <div id="repairs-title-results"><p>Scan to preview each title before and after.</p></div>
+                        </div>
+                    </div>
+                    <div class="action-card">
+                        <div class="action-card-header">
+                            <span>Broken links by domain</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="scanDeadDomains">Scan</button>
+                                <button class="action-btn" type="button" data-apply="deaddomain" data-apply-label="Delete" disabled data-call="applyBulk" data-arg="deaddomain">Delete</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            Groups the broken title/URL scan and the dead rows of a finished Link check by parent domain. One checkbox per broken link plus an “all N” toggle per domain; a link that was never checked is never counted. Delete opens the shared delete preview, so protected folders are honoured.
+                            <div id="repairs-deaddomain-results"><p>Scan to group broken links by domain.</p></div>
+                        </div>
+                    </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Find and replace</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanFindReplace">Scan</button>
+                            <button class="action-btn" type="button" data-apply="replace" data-apply-label="Replace" disabled data-call="applyBulk" data-arg="replace">Replace</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        A regular expression over titles, URLs, or both, in the selection, the open folder, or the whole library. Scan previews every before/after pair; Replace applies to the checked rows as one undoable step.
+                        <div class="replace-form">
+                            <label>Find <input type="text" id="repairs-find" placeholder="e.g. \\(\\d+\\)\\s*$" spellcheck="false"></label>
+                            <label>Replace with <input type="text" id="repairs-replace-with" placeholder="e.g. (removed)" spellcheck="false"></label>
+                            <label>Scope
+                                <select id="repairs-replace-scope">
+                                    <option value="library">Whole library</option>
+                                    <option value="folder">Open folder</option>
+                                    <option value="selection">Selection</option>
+                                </select>
+                            </label>
+                            <label>Fields
+                                <select id="repairs-replace-fields">
+                                    <option value="title">Titles</option>
+                                    <option value="url">URLs</option>
+                                    <option value="both">Titles and URLs</option>
+                                </select>
+                            </label>
+                            <label class="replace-case"><input type="checkbox" id="repairs-replace-case"> Match case</label>
+                        </div>
+                        <div id="repairs-replace-results"><p>Scan to preview every entry the pattern matches.</p></div>
+                    </div>
+                </div>
+
+                                    <div class="action-card">
+                        <div class="action-card-header">
+                            <span>Bulk edit titles</span>
+                            <div class="action-header-btns">
+                                <button class="action-btn" type="button" data-call="scanBulkEditTemplate">Scan</button>
+                                <button class="action-btn" type="button" data-apply="bulkedit" data-apply-label="Rename" disabled data-call="applyBulk" data-arg="bulkedit">Rename</button>
+                            </div>
+                        </div>
+                        <div class="action-card-body">
+                            Rebuild titles from a template instead of a find-and-replace. Tokens: <code>{title}</code> <code>{url}</code> <code>{domain}</code> <code>{folder}</code> <code>{date}</code> <code>{n}</code> (1, 2, 3…) and <code>{nn}</code> (01, 02…). Previewed, then applied as one undo step.
+                            <div class="replace-form">
+                                <label>Template <input type="text" id="repairs-bulkedit-template" placeholder="{title} — {domain}" spellcheck="false"></label>
+                                <label>Scope
+                                    <select id="repairs-bulkedit-scope">
+                                        <option value="folder">Open folder</option>
+                                        <option value="selection">Selection</option>
+                                        <option value="library">Whole library</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div id="repairs-bulkedit-results"><p>Scan to preview every title the template would change.</p></div>
+                        </div>
+                    </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Same title and domain</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanSameTitleDomain">Scan</button>
+                            <button class="action-btn" type="button" data-apply="sametitle" data-apply-label="Delete copies" disabled data-call="applyBulk" data-arg="sametitle">Delete copies</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Finds bookmarks whose title and parent domain match but whose URLs differ, which catches the same page saved with different tracking parameters or query strings. The first copy of each group is kept; check the extras to delete them.
+                        <div id="repairs-sametitle-results"><p>Scan to group bookmarks that look like the same page.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Library health</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanLibraryHealth">Scan</button>
+                            <button class="action-btn" type="button" data-call="applyHealthFixes" id="repairs-health-fix" disabled>Fix safe ones</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Every scan in one table with its count, so you can see what needs attention and jump straight to it. <strong>Fix safe ones</strong> strips tracking parameters and removes empty folders in one undoable step; everything else stays manual.
+                        <div id="repairs-health-results"><p>Scan to count what is wrong across the library.</p></div>
+                    </div>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Merge duplicate sibling folders</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanDuplicateFolders">Scan</button>
+                            <button class="action-btn" type="button" data-apply="dup-folders" data-apply-label="Merge" disabled data-call="applyBulk" data-arg="dup-folders">Merge</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Merges two folders with the same name under one parent (including <code>news</code> vs <code>r/news</code>). Children move into the older folder. Scan first, then apply.
+                        <div id="repairs-dup-folders-results"><p>Scan to preview which folder is kept and which is merged away.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Same path, different query</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanCanonicalDupes">Scan</button>
+                            <button class="action-btn" type="button" data-apply="canon-dupes" data-apply-label="Keep oldest" disabled data-call="applyBulk" data-arg="canon-dupes">Keep oldest</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Groups bookmarks by host + path (AMP segments ignored). If the query strings differ, keeps the oldest and removes the rest.
+                        <div id="repairs-canon-results"><p>Scan to preview each extra bookmark and the URL that would be kept.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>AMP paths and old.reddit.com</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanAmpHosts">Scan</button>
+                            <button class="action-btn" type="button" data-apply="amp-host" data-apply-label="Rewrite" disabled data-call="applyBulk" data-arg="amp-host">Rewrite</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Strips <code>/amp</code> from paths and rewrites <code>old.reddit.com</code> / <code>m.reddit.com</code> / <code>np.reddit.com</code> to <code>www.reddit.com</code>.
+                        <div id="repairs-amp-results"><p>Scan to preview each URL before and after.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>HTML-entity titles</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanEntityTitles">Scan</button>
+                            <button class="action-btn" type="button" data-apply="entities" data-apply-label="Decode" disabled data-call="applyBulk" data-arg="entities">Decode</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Decodes <code>&amp;amp;</code>, <code>&amp;quot;</code>, and numeric entities in titles.
+                        <div id="repairs-entities-results"><p>Scan to preview each title before and after.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Broken titles, URLs, and unparseable links</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="scanBrokenLinks">Scan</button>
+                            <button class="action-btn" type="button" data-apply="broken" data-apply-label="Delete" disabled data-call="applyBulk" data-arg="broken">Delete</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Lists bookmarks whose title or URL contains <code>broken</code>, empty hrefs, and values that fail <code>new URL()</code>. Bookmark rows are checked; Delete removes the checked ones. Folders are listed only; edit them from the Bookmarks tab.
+                        <div id="repairs-broken-results"><p>Scan to list broken titles and URLs.</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dupe-cleanup-actions" class="child-pane">
+                <h2>Duplicates</h2>
+                <div class="action-subtext">
+                    Groups bookmarks that share a URL. Mark copies, then remove the selection. The folder path opens that folder in Bookmarks. The eye shows that bookmark; the folder mark/unmark button selects every duplicate in that folder across all groups. The trash on a URL group marks every copy except the oldest. <strong>Select newest in same folder</strong> checks only the newer copy when two or more copies of a URL sit in one folder, and leaves the oldest unchecked. <strong>Select outer nested copies</strong> checks a copy when the same URL is also saved somewhere inside one of that folder’s subfolders, so only the most deeply nested copy stays unchecked. Use <strong>Remove all selected</strong> to delete what is checked (disabled until at least one copy is checked).
+                </div>
+                <div class="dupe-toolbar">
+                    <button class="action-btn" type="button" data-call="scanDuplicateBookmarks">Find duplicate bookmarks</button>
+                    <button class="action-btn" type="button" id="dupe-remove-empty" data-call="removeEmptyFoldersCleanup">Remove empty folders</button>
+                    <button class="action-btn" type="button" data-call="mergeDuplicateFoldersCleanup">Merge duplicate folders</button>
+                    <button class="action-btn" type="button" data-call="markNewestSameFolderDupes">Select newest in same folder</button>
+                    <button class="action-btn" type="button" data-call="markOuterNestedDupes">Select outer nested copies</button>
+                </div>
+                <div id="dupe-cleanup-note"></div>
+                <div id="dupe-cleanup-results">
+                    <p>Find duplicate bookmarks to list groups.</p>
+                </div>
+            </div>
+
+            <div id="nearby-actions" class="child-pane">
+                <h2>Nearby Bookmarks</h2>
+                <div class="action-subtext">100 bookmarks before and 100 after the chosen bookmark, ordered by <code>dateAdded</code>. Search bookmarks are marked so a gap in a search chain is easier to see.</div>
+                <div id="nearby-results"><p>Right-click a bookmark and choose Nearby bookmarks.</p></div>
+            </div>
+
+            <div id="link-check-actions" class="child-pane">
+                <h2>Link check</h2>
+                <div class="action-subtext">
+                    Fetches each <code>http(s)</code> bookmark (6 at a time, 12s timeout). Live add-on only. Scope:
+                    <select id="link-check-scope">
+                        <option value="folder">Open folder and subfolders</option>
+                        <option value="library">Whole library</option>
+                    </select>
+                    <button class="action-btn" type="button" data-call="stopLinkCheck">Stop</button>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>Dead links</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="checkDeadLinks">Check</button>
+                            <button class="action-btn" type="button" id="link-check-delete" disabled data-call="deleteDeadLinks">Delete selected</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Dead means 404/410, no response, or timed out. Other HTTP errors are listed unchecked.
+                        <div id="link-check-results"><p>Check to list dead links.</p></div>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <div class="action-card-header">
+                        <span>URL-only titles</span>
+                        <div class="action-header-btns">
+                            <button class="action-btn" type="button" data-call="fetchUrlTitles">Fetch titles</button>
+                            <button class="action-btn" type="button" data-apply="url-titles" data-apply-label="Rename" disabled data-call="applyBulk" data-arg="url-titles">Rename</button>
+                        </div>
+                    </div>
+                    <div class="action-card-body">
+                        Bookmarks whose title is empty or the URL get the page’s <code>&lt;title&gt;</code> (YouTube via oEmbed).
+                        <div id="url-title-results"><p>Fetch titles to preview each rename.</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="script-actions" class="child-pane">
+                <h2>Script Lab</h2>
+                <div class="action-subtext">Run a custom JavaScript transformation against the loaded bookmark tree.</div>
+                <div class="action-card">
+                    <div class="action-card-header"><span>Custom bookmark script</span><button class="action-btn" data-call="runBookmarkScript">Run script</button></div>
+                    <div class="action-card-body">
+                        <p class="script-help">Your script receives <code>bookmarks</code> (the full root object) and <code>api</code>. Use <code>api.walk((node, parent) =&gt; { ... })</code> to visit each item, <code>api.log(type, title, details)</code> for the affected log, and <code>api.selectedFolder()</code> for the current folder. Changes remain unsaved until you export.</p>
+                        <textarea id="bookmark-script" class="script-editor" spellcheck="false" placeholder="// Example: count bookmarks&#10;let count = 0;&#10;api.walk(node => { if (node.uri) count++; });&#10;return count;"></textarea>
+                        <div id="script-output" class="script-output" role="status"></div>
+                    </div>
+                </div>
+                <div class="script-examples">
+                    <button type="button" class="ghost-btn" data-call="loadScriptExample" data-arg="count">Count links</button>
+                    <button type="button" class="ghost-btn" data-call="loadScriptExample" data-arg="folder">Titles in this folder</button>
+                    <button type="button" class="ghost-btn" data-call="loadScriptExample" data-arg="missing">Bookmarks missing a URL</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- View 3: Affected Links Log -->
+    <div id="tabs-view" class="view-pane open-tabs-view">
+        <div class="page-head">
+            <div>
+                <h1>Open Tabs</h1>
+                <p id="open-tabs-meta">Every browser window and its tabs.</p>
+            </div>
+                            <div class="open-tabs-tools">
+                    <span class="open-tabs-group" role="group" aria-label="Filter the list">
+                        <input id="open-tabs-filter" type="search" placeholder="Filter title or URL" data-call="filterOpenTabs">
+                    </span>
+                    <span class="open-tabs-group" role="group" aria-label="How the list is drawn">
+                        <span class="open-tabs-group-label" aria-hidden="true">View</span>
+                        <button type="button" class="ghost-btn" id="open-tabs-collapse-all" data-call="toggleAllOpenTabsWindows" title="Collapse every window to its header, or expand them all again">Collapse all</button>
+                        <button type="button" class="ghost-btn" id="open-tabs-condensed" data-call="toggleOpenTabsCondensed" aria-pressed="false" title="One line per tab; the opened and viewed times move into the tooltip">Condensed view</button>
+                        <button type="button" class="ghost-btn" id="open-tabs-chain-groups" data-call="toggleOpenTabsChainGroups" aria-pressed="false" title="Show each search chain (a search tab and what it opened within 2 minutes) as a subgroup of its window. Display only: the real tab order does not change.">Group chains</button>
+                    </span>
+                    <span class="open-tabs-group" role="group" aria-label="Change the browser's tabs and windows">
+                        <span class="open-tabs-group-label" aria-hidden="true">Tabs</span>
+                        <button type="button" class="ghost-btn" id="open-tabs-merge" data-call="mergeOpenTabsWindows" title="Move every tab from every other window into this one, then close those windows">Merge windows</button>
+                        <button type="button" class="ghost-btn" id="open-tabs-close-dupes" data-call="closeDuplicateOpenTabs" title="Close every tab whose URL is already open earlier in the same window">Close duplicate tabs</button>
+                    </span>
+                    <span class="open-tabs-group" role="group" aria-label="Read and save">
+                        <span class="open-tabs-group-label" aria-hidden="true">Library</span>
+                        <button type="button" class="ghost-btn" data-call="refreshOpenTabsWithLibrary" title="Read the browser's windows and tabs again">Refresh</button>
+                        <span class="open-window-save">
+                            <button type="button" class="action-btn" title="Save every window except the Bookmark Library window into its own subfolder of Other Bookmarks / Opened Tabs">Bookmark all windows ▾</button>
+                            <span class="open-window-menu" role="menu">
+                                <button type="button" class="context-menu-item" role="menuitem" data-call="bookmarkAllOpenWindows" data-arg="close">Bookmark and Close</button>
+                                <button type="button" class="context-menu-item" role="menuitem" data-call="bookmarkAllOpenWindows" data-arg="keep">Bookmark Only</button>
+                            </span>
+                        </span>
+                    </span>
+                </div>
+            </div>
+<div id="open-tabs-note" class="open-tabs-note" hidden></div>
+        <div id="open-tabs-body" class="open-tabs-body"></div>
+    </div>
+
+    <div id="affected-view" class="view-pane affected-view">
+        <div class="page-head">
+            <div>
+                <h1>Affected Links Log</h1>
+                <p id="affected-log-meta">Events are kept for 7 days. Newest first.</p>
+            </div>
+            <div class="log-tools">
+                <select id="affected-filter-type" data-call="renderAffectedLog" title="Filter by type">
+                    <option value="">All types</option>
+                </select>
+                <select id="affected-filter-source" data-call="renderAffectedLog" title="Filter by source">
+                    <option value="">All sources</option>
+                </select>
+                <input type="search" id="affected-filter-text" data-call="renderAffectedLog" placeholder="Filter text" title="Filter by title, folder, URL, or details">
+                <button type="button" class="ghost-btn" data-call="exportAffectedLogCsv">Export CSV</button>
+                <button type="button" class="ghost-btn" data-call="exportAffectedLogJson">Export JSON</button>
+                <button type="button" class="ghost-btn" data-call="clearAffectedLog">Clear log</button>
+            </div>
+        </div>
+        <div class="affected-table-wrap">
+            <table class="excel-table" id="affected-log-table">
+                <thead>
+                    <tr>
+                        <th class="row-num">#</th>
+                        <th>When</th>
+                        <th class="log-type">Type</th>
+                        <th>Title</th>
+                        <th>Folder</th>
+                        <th>URL</th>
+                        <th>Change details</th>
+                    </tr>
+                </thead>
+                <tbody id="affected-log-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="settings-view" class="view-pane settings-view">
+        <div class="page-head">
+            <div>
+                <h1>Settings</h1>
+                <p>Saved in this browser. The JSON app and the extension each keep their own copy.</p>
+            </div>
+        </div>
+        <form class="settings-form">
+            <div class="settings-section">Search syntax
+                <span class="settings-hint">Optional: turn every operator off and the box searches for exact text</span>
+            </div>
+            <div class="settings-search-syntax">
+                <label class="operator-choice"><input type="checkbox" id="setting-search-operators" data-call="applySearchSyntaxSettings"> Use search operators (domain:, has:, -word, /regex/)</label>
+                  <label class="operator-choice"><input type="checkbox" id="setting-search-whole-words" data-call="applySearchSyntaxSettings"> Whole words only</label>
+                  <label class="operator-choice"><input type="checkbox" id="setting-search-case" data-call="applySearchSyntaxSettings"> Case sensitive</label>
+                  <label class="operator-choice"><input type="checkbox" id="setting-search-exhaustive" data-call="applySearchSyntaxSettings"> Exhaustive search (slow, quadratic)</label>
+                <p class="settings-note" id="search-syntax-note"></p>
+                <p class="settings-note" id="search-exhaustive-note"></p>
+                <div class="operator-family-grid">
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-domain" data-call="applySearchSyntaxSettings"> <code>domain:example.com</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-folder" data-call="applySearchSyntaxSettings"> <code>folder:Cats</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-title" data-call="applySearchSyntaxSettings"> <code>title:postgres</code></label>
+                      <label class="operator-choice"><input type="checkbox" id="setting-search-family-tag" data-call="applySearchSyntaxSettings"> <code>tag:recipe</code></label>
+                      <label class="operator-choice"><input type="checkbox" id="setting-search-family-type" data-call="applySearchSyntaxSettings"> <code>type:pdf / type:image</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-url" data-call="applySearchSyntaxSettings"> <code>url:docs</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-added" data-call="applySearchSyntaxSettings"> <code>added:&gt;2024-01</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-has" data-call="applySearchSyntaxSettings"> <code>has:note / has:dupe</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-is" data-call="applySearchSyntaxSettings"> <code>is:tracked / is:untitled</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-exclude" data-call="applySearchSyntaxSettings"> <code>-word (exclude)</code></label>
+                    <label class="operator-choice"><input type="checkbox" id="setting-search-family-regex" data-call="applySearchSyntaxSettings"> <code>/pattern/ regex</code></label>
+                </div>
+            </div>
+            <div class="settings-section">URL cleaning rules</div>
+            <div class="settings-rules">
+                <p class="settings-note">These rules drive every clean copy, the Obsidian sends and the background tidy: the parameter rules run first, then the built-in canonicalisers (YouTube, Google redirects, Google search).  <span id="url-rules-note"></span></p>
+                <ol id="url-rules-active" class="rules-list"></ol>
+                <textarea id="url-rules-json" rows="12" spellcheck="false" aria-label="URL rules as JSON"></textarea>
+                <div class="rules-buttons">
+                    <button type="button" class="action-btn" data-call="saveUrlRulesFromEditor">Save rules</button>
+                    <button type="button" class="ghost-btn" data-call="activeUrlRulesJson">Load current</button>
+                    <button type="button" class="ghost-btn" data-call="resetUrlRulesFromEditor">Reset to built-ins</button>
+                    <button type="button" class="ghost-btn" data-call="exportUrlRules">Export JSON</button>
+                    <button type="button" class="ghost-btn" data-call="pickUrlRulesImport">Import JSON</button>
+                </div>
+                <div class="replace-form">
+                    <label>Test a URL <input type="text" id="url-rules-test" placeholder="https://example.com/page?utm_source=x&fbclid=y" spellcheck="false" aria-label="URL to test the rules against"></label>
+                    <button type="button" class="ghost-btn" data-call="testUrlRulesFromEditor">Test</button>
+                </div>
+                <div id="url-rules-test-result"><p>Test shows the stripped URL, the clean copy, and which rule changed what.</p></div>
+            </div>
+            <div class="settings-section">Stored data
+                <span class="settings-hint">Notes, the trash, sort memory and protections live in this browser only.</span>
+            </div>
+            <div class="settings-storage">
+                <div id="storage-usage"><p>Nothing stored yet.</p></div>
+                <p class="settings-note" id="storage-estimate"></p>
+            </div>
+
+            <label>Theme
+                <select id="setting-theme" data-call="applyEditorSetting" data-arg="theme">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="auto">Auto (follow the system)</option>
+                </select>
+            </label>
+            <label>Density
+                <select id="setting-density" data-call="applyEditorSetting" data-arg="density" aria-label="Row density">
+                    <option value="comfortable">Comfortable</option>
+                    <option value="compact">Compact</option>
+                </select>
+            </label>
+            <label>Bookmark columns
+                <select id="setting-columns" data-call="applyEditorSetting" data-arg="columns" aria-label="Which bookmark columns to show">
+                    <option value="all">Name, Location, Added, Tags</option>
+                    <option value="name-location">Name and Location</option>
+                    <option value="name-added">Name and Added</option>
+                    <option value="name-only">Name only</option>
+                </select>
+            </label>
+            <label>Statistics sort
+                <select id="setting-stats-sort" data-call="applyEditorSetting" data-arg="statsSort">
+                    <option value="count">Most links</option>
+                    <option value="rdnn">Reverse domain</option>
+                    <option value="recent">Most recently added</option>
+                    <option value="oldest">Oldest first added</option>
+                    <option value="rate">Fastest recent (day)</option>
+                </select>
+            </label>
+            <label>Quick-add gap
+                <select id="setting-burst-gap" data-call="applyEditorSetting" data-arg="burstGap">
+                    <option value="30000">30 seconds</option>
+                    <option value="60000">1 minute</option>
+                    <option value="120000">2 minutes</option>
+                    <option value="300000">5 minutes</option>
+                    <option value="900000">15 minutes</option>
+                    <option value="3600000">1 hour</option>
+                </select>
+            </label>
+            <label>Min session size
+                <select id="setting-burst-min" data-call="applyEditorSetting" data-arg="burstMin">
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </label>
+            <label>Folder tree width (px)
+                <input id="setting-sidebar-width" type="number" min="140" step="10" value="350" data-call="applyEditorSetting" data-arg="sidebarWidth">
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-refresh-dupes" type="checkbox" checked data-call="applyEditorSetting" data-arg="refreshDupesOnDelete">
+                Refresh Find duplicate bookmarks after deleting a duplicate
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-open-tabs-skip-saved" type="checkbox" checked data-call="applyEditorSetting" data-arg="skipBookmarkedOpenTabs">
+                Skip tabs that are already bookmarked when saving an Open Tabs window (off saves a second copy)
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-open-tabs-chain-folders" type="checkbox" checked data-call="applyEditorSetting" data-arg="openTabsChainFolders">
+                Save each search chain into its own folder inside the window folder
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-auto-move-toolbar" type="checkbox" checked data-call="applyEditorSetting" data-arg="autoMoveToolbarLinks">
+                Move Bookmarks Toolbar links into Other Bookmarks
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-auto-move-mobile" type="checkbox" checked data-call="applyEditorSetting" data-arg="autoMoveMobile">
+                Move Mobile Bookmarks into Other Bookmarks
+            </label>
+            <label>Folder to open when a library loads
+                <select id="setting-startup-folder" data-call="applyEditorSetting" data-arg="startupFolder">
+                    <option value="toolbar">Bookmarks Toolbar</option>
+                    <option value="root">Library root</option>
+                </select>
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-hide-root" type="checkbox" checked data-call="applyEditorSetting" data-arg="hideRootFolder">
+                Hide the library root in the folder tree and in folder paths
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-youtube-suffix" type="checkbox" checked data-call="applyEditorSetting" data-arg="youtubeTitleSuffix">
+                Add " - YouTube" when sending or bookmarking a watch video
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-google-suffix" type="checkbox" checked data-call="applyEditorSetting" data-arg="googleTitleSuffix">
+                Add " - Google Search" when sending a search
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-clean-urls" type="checkbox" checked data-call="applyEditorSetting" data-arg="cleanSentUrls">
+                Clean YouTube and Google URLs when sending
+            </label>
+            <label class="setting-toggle">
+                <input id="setting-reddit-chrome" type="checkbox" checked data-call="applyEditorSetting" data-arg="stripRedditChrome">
+                Strip Reddit comment chrome when sending selected text
+            </label>
+            <label>Obsidian note
+                <input id="setting-obsidian-note" type="text" placeholder="Empty uses today's date" data-call="applyEditorSetting" data-arg="obsidianNotePath">
+            </label>
+            <label>Insert sent bookmarks
+                <select id="setting-obsidian-insert" data-call="applyEditorSetting" data-arg="obsidianInsert">
+                    <option value="after">Below the current line, same level</option>
+                    <option value="under">Nested under the current line</option>
+                </select>
+            </label>
+            <label>Send bookmarks to
+                <select id="setting-obsidian-destination" data-call="applyEditorSetting" data-arg="obsidianDestination">
+                    <option value="cursor">The note I am in, at the cursor</option>
+                    <option value="daily">The daily note</option>
+                    <option value="both">Both — an item for each in the menu</option>
+                </select>
+            </label>
+            <label>If no note is open
+                <select id="setting-obsidian-fallback" data-call="applyEditorSetting" data-arg="obsidianFallback">
+                    <option value="notice">Show a notice, send nothing</option>
+                    <option value="daily">Append to the daily note instead</option>
+                </select>
+            </label>
+            <label>Move interval
+                <select id="setting-auto-move-hours" data-call="applyEditorSetting" data-arg="autoMoveHours">
+                    <option value="0.25">Every 15 minutes</option>
+                    <option value="0.5">Every 30 minutes</option>
+                    <option value="0.75">Every 45 minutes</option>
+                    <option value="1">Every hour</option>
+                    <option value="2">Every 2 hours</option>
+                    <option value="3">Every 3 hours</option>
+                    <option value="4">Every 4 hours</option>
+                    <option value="6">Every 6 hours</option>
+                    <option value="8">Every 8 hours</option>
+                    <option value="12">Every 12 hours</option>
+                    <option value="24">Every day</option>
+                    <option value="48">Every 2 days</option>
+                    <option value="72">Every 3 days</option>
+                    <option value="168">Every week</option>
+                </select>
+            </label>
+            <p class="setting-help">When on, every interval (default 1 hour) this runs the same moves as the folder-tree commands: direct links off Bookmarks Toolbar (folders stay), and all children out of Mobile Bookmarks (that folder stays), into Other Bookmarks. JSON: only while this page is open. Live: the add-on keeps the timer if the library tab is closed. The switches above the interval loosen sending: titles, URL cleaning, Reddit chrome, which folder opens, and the Obsidian note path. Empty note path stays <code>YYYY-MM-DD</code>. YouTube repair actions on the Actions tab still add the suffix when you run them.</p>
+        </form>
+    </div>
+
+    <div id="docs-view" class="view-pane docs-view">
+        <div class="page-head">
+            <div>
+                <h1>Documentation</h1>
+                <p>Every behavior in this copy of Bookmark Library.</p>
+            </div>
+            <div class="search">
+                <input id="docs-search" type="search" placeholder="Search the manual" data-call="filterDocumentation">
+            </div>
+        </div>
+        <div class="docs-layout">
+            <nav id="docs-nav" class="docs-nav"></nav>
+            <div id="docs-body" class="docs-body"></div>
+        </div>
+    </div>
+
+    <div id="folder-hover-tip" class="folder-hover-tip" hidden role="tooltip"></div>
+
+    <div id="stats-panel" class="stats-panel" hidden>
+        <div class="stats-panel-backdrop" data-call="closeStatsPanel"></div>
+        <aside class="stats-panel-sheet" role="dialog" aria-modal="true" aria-labelledby="stats-panel-title">
+            <header class="stats-panel-head">
+                <div>
+                    <h2 id="stats-panel-title">Service details</h2>
+                    <p id="stats-panel-meta"></p>
+                    <div id="stats-panel-actions" class="stats-panel-actions" hidden></div>
+                </div>
+                <button type="button" class="action-btn stats-panel-close" data-call="closeStatsPanel">Close</button>
+            </header>
+            <div id="stats-panel-body" class="stats-panel-body"></div>
+        </aside>
+    </div>
+
+    <div id="edit-item-dialog" class="edit-dialog" hidden>
+        <div class="edit-dialog-backdrop" data-call="closeEditItemDialog"></div>
+        <form id="edit-item-form" class="edit-dialog-sheet">
+            <h2 id="edit-item-heading">Edit</h2>
+            <label>Title
+                <input id="edit-item-title" type="text" autocomplete="off">
+            </label>
+            <label id="edit-item-link-field">Link
+                <input id="edit-item-link" type="text" autocomplete="off" spellcheck="false">
+            </label>
+                <label id="edit-item-description-field">Description
+                    <textarea id="edit-item-description" rows="3" placeholder="A note for this bookmark (kept by the app, written to HTML/JSON exports)"></textarea>
+                </label>
+            <div class="edit-dialog-actions">
+                <button type="button" class="ghost-btn" data-call="closeEditItemDialog">Cancel</button>
+                <button type="submit" class="action-btn">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="move-search-folder-dialog" class="edit-dialog" hidden>
+        <div class="edit-dialog-backdrop" data-call="closeMoveSearchFolderDialog"></div>
+        <form id="move-search-folder-form" class="edit-dialog-sheet">
+            <h2 id="move-search-folder-heading">Move search bookmarks into a folder</h2>
+            <label>Folder name
+                <input id="move-search-folder-name" type="text" autocomplete="off">
+            </label>
+            <div class="edit-dialog-actions">
+                <button type="button" class="ghost-btn" data-call="closeMoveSearchFolderDialog">Cancel</button>
+                <button type="submit" class="action-btn">Move</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Context Menu -->
+    <input type="file" id="merge-upload" style="display: none" accept=".json" data-call="mergeBookmarkFile">
+    <input type="file" id="url-rules-upload" style="display: none" accept=".json" data-call="importUrlRules">
+    <input type="file" id="settings-upload" style="display: none" accept=".json" data-call="importEditorSettings">
+    <div class="edit-dialog" id="preview-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="preview-heading">
+        <div class="edit-dialog-backdrop" data-call="closePreviewDialog"></div>
+        <div class="edit-dialog-card">
+            <h2 id="preview-heading">Confirm changes</h2>
+            <p class="edit-dialog-note" id="preview-note"></p>
+            <div id="preview-list" class="trash-list"></div>
+            <div class="edit-dialog-actions">
+                <button type="button" class="ghost-btn" data-call="closePreviewDialog">Cancel</button>
+                <button type="button" class="action-btn" id="preview-confirm" data-call="confirmPreviewDialog">Apply</button>
+            </div>
+        </div>
+    </div>
+    <div class="edit-dialog" id="trash-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="trash-heading">
+        <div class="edit-dialog-card">
+            <h2 id="trash-heading">Recently deleted</h2>
+            <p class="edit-dialog-note" id="trash-note"></p>
+            <div id="trash-list" class="trash-list"></div>
+            <div class="edit-dialog-actions">
+                <button type="button" class="ghost-btn" data-call="undoClearTrash" id="trash-undo-clear" hidden>Put back what I emptied</button>
+                <button type="button" class="ghost-btn" data-call="clearTrash" id="trash-clear">Empty trash</button>
+                <button type="button" class="action-btn" data-call="restoreAllTrash" id="trash-restore-all">Restore everything</button>
+                <button type="button" class="action-btn" data-call="closeTrashDialog">Close</button>
+            </div>
+        </div>
+    </div>
+    <div class="command-palette" id="command-palette" hidden role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="command-palette-card">
+            <input type="search" id="command-palette-input" placeholder="Type a command, folder, or bookmark…" autocomplete="off" spellcheck="false">
+            <div id="command-palette-results" class="command-palette-results" role="listbox"></div>
+            <p class="command-palette-hint">↑ ↓ to move · Enter to run · Esc to close · Cmd/Ctrl+K to open</p>
+        </div>
+    </div>
+    <input type="file" id="html-import-input" style="display: none" accept=".html,.htm,text/html" data-call="importNetscapeHtml">
+    <div class="context-menu" id="context-menu">
+        <div class="context-menu-stats" id="context-folder-stats" hidden></div>
+        <div class="context-menu-separator" id="context-folder-stats-sep" hidden></div>
+        <div class="menu-group">Create</div>
+        <div class="context-menu-item" data-call="handleContextAction" data-arg="newBookmark">New Bookmark...</div>
+        <div class="context-menu-item" data-call="handleContextAction" data-arg="newFolder">New Folder...</div>
+        <div class="context-menu-item" id="context-nest" data-call="nestSelectionInNewFolder">Nest in new folder...</div>
+        <div class="menu-group">Edit</div>
+        <div class="context-menu-item" data-call="handleContextAction" data-arg="edit">Edit...</div>
+        <div class="context-menu-item" id="context-reveal" data-call="handleContextAction" data-arg="revealInFolder" title="Open the folder this entry lives in, and select the entry there">Go to its folder</div>
+        <div class="context-menu-separator" id="context-crud-sep"></div>
+        <div class="menu-group">Remove</div>
+        <div class="context-menu-item" id="context-delete" data-call="handleContextAction" data-arg="delete">Delete</div>
+        <div class="context-menu-separator" id="context-read-sep"></div>
+        <div class="menu-group">Open and find</div>
+        <div class="context-menu-item" id="context-open-subreddit" hidden data-call="openFolderSubreddit" data-arg="row">Open subreddit</div>
+        <div class="context-menu-separator" id="context-open-subreddit-sep" hidden></div>
+        <div class="context-menu-item" id="context-open" data-call="handleContextAction" data-arg="open">Open</div>
+        <div class="context-menu-item has-submenu" id="context-copy" title="Copy this bookmark’s title, its URL, or a “- [title](url)” markdown line. URLs are always the clean ones: tracking parameters stripped (General repairs → Tracking-parameter stripper) and Google/YouTube links shortened the way the Obsidian sends shorten them.">
+            Copy<span class="context-submenu-caret" aria-hidden="true">▸</span>
+            <span class="context-menu-sub" role="menu">
+                <div class="context-menu-item" id="context-copy-title" data-call="handleContextAction" data-arg="copyTitle">Copy Title</div>
+                <div class="context-menu-item" id="context-copy-url" data-call="handleContextAction" data-arg="copyUrl">Copy URL</div>
+                <div class="context-menu-item" id="context-copy-url-original" hidden data-call="handleContextAction" data-arg="copyUrlOriginal" title="The bookmark’s URL exactly as it is stored. Shown only while cleaning would change it.">Copy URL (Original)</div>
+                <div class="context-menu-item" id="context-copy-markdown" data-call="handleContextAction" data-arg="copyMarkdown">Copy as Markdown</div>
+            </span>
+        </div>
+        <div class="context-menu-item" id="context-nearby" data-call="handleContextAction" data-arg="nearby">Nearby bookmarks</div>
+        <div class="context-menu-item" id="context-find-domain" data-call="handleContextAction" data-arg="findDomain">Show in By domain</div>
+        <div class="context-menu-item" id="context-search-chain" data-call="handleContextAction" data-arg="searchChain">Show in Search chain</div>
+        <div class="context-menu-item" id="context-dupes" data-call="handleContextAction" data-arg="dupes">Show duplicates</div>
+        <div class="context-menu-item" id="context-check-link" data-call="handleContextAction" data-arg="checkLink">Check link</div>
+        <div class="context-menu-separator" id="context-send-sep"></div>
+        <div class="menu-group">Send</div>
+        <div class="context-menu-item" id="context-send-obsidian" data-call="handleContextAction" data-arg="sendObsidian">Send bookmark to Obsidian</div>
+        <div class="context-menu-item" id="context-send-obsidian-delete" data-call="handleContextAction" data-arg="sendObsidianDelete">Send bookmark to Obsidian and delete</div>
+        <div class="context-menu-item" id="context-send-obsidian-daily" data-call="handleContextAction" data-arg="sendObsidianDaily" title="Append to the daily note (the Obsidian note path setting, or today's dated note) instead of inserting at the cursor">Send bookmark to Obsidian (Daily note)</div>
+        <div class="context-menu-item" id="context-send-obsidian-daily-delete" data-call="handleContextAction" data-arg="sendObsidianDailyDelete" title="Append to the daily note, then delete the bookmarks">Send bookmark to Obsidian (Daily note) and delete</div>
+        <div class="context-menu-item" id="context-send-folder-obsidian" hidden data-call="handleContextAction" data-arg="sendFolderObsidian">Send folder to Obsidian</div>
+        <div class="context-menu-item" id="context-send-folder-obsidian-delete" hidden data-call="handleContextAction" data-arg="sendFolderObsidianDelete">Send folder to Obsidian and delete</div>
+        <div class="context-menu-item" id="context-send-folder-obsidian-daily" hidden data-call="handleContextAction" data-arg="sendFolderObsidianDaily" title="Append the folder to the daily note instead of inserting at the cursor">Send folder to Obsidian (Daily note)</div>
+        <div class="context-menu-item" id="context-send-folder-obsidian-daily-delete" hidden data-call="handleContextAction" data-arg="sendFolderObsidianDailyDelete" title="Append the folder to the daily note, then delete it">Send folder to Obsidian (Daily note) and delete</div>
+        <div class="context-menu-separator" id="context-folder-sep"></div>
+        <div class="menu-group">Folder</div>
+        <div class="context-menu-item" id="context-export-html" hidden data-call="handleContextAction" data-arg="exportHtml">Export as HTML (Netscape bookmark file)</div>
+        <div class="context-menu-item" id="context-export-json" hidden data-call="handleContextAction" data-arg="exportJson">Export folder as JSON...</div>
+        <div class="context-menu-item" id="context-open-all" hidden data-call="handleContextAction" data-arg="openAll">Open all bookmarks in tabs...</div>
+        <div class="context-menu-item" id="context-protect" hidden data-call="handleContextAction" data-arg="toggleProtect">Protect from scans</div>
+        <div class="context-menu-separator" id="context-edit-sep"></div>
+        <div class="menu-group">Move</div>
+        <div class="context-menu-item" id="context-move-other" data-call="moveSelectionToOtherBookmarks">Move to Other Bookmarks</div>
+        <div class="context-menu-item" id="context-move-links-below" hidden data-call="handleContextAction" data-arg="moveLinksBelow">Move links underneath folders</div>
+    </div>
+    <div class="context-menu" id="location-context-menu">
+        <div class="context-menu-item" id="location-find-domain" data-call="findLocationInDomainStats">Find in By domain</div>
+    </div>
+    <div class="context-menu" id="library-background-menu">
+        <div class="context-menu-item" data-call="addChildInCurrentFolder" data-arg="folder">New Folder...</div>
+        <div class="context-menu-item" data-call="addChildInCurrentFolder" data-arg="bookmark">New Bookmark...</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-call="exportFolderAsHtml" data-arg="current">Export as HTML (Netscape bookmark file)</div>
+    </div>
+    <div class="context-menu" id="open-tabs-menu">
+        <div class="context-menu-item" id="open-tabs-menu-open" data-call="openTabsMenuOpen">Switch to tab</div>
+        <div class="context-menu-item" data-call="openTabsMenuReload">Reload tab</div>
+        <div class="context-menu-item" data-call="openTabsMenuDuplicate">Duplicate tab</div>
+        <div class="context-menu-item has-submenu" id="open-tabs-menu-copy" title="Copy this tab’s title, its URL, or a “- [title](url)” markdown line. URLs are always the clean ones: tracking parameters stripped (General repairs → Tracking-parameter stripper) and Google/YouTube links shortened the way the Obsidian sends shorten them.">
+            Copy<span class="context-submenu-caret" aria-hidden="true">▸</span>
+            <span class="context-menu-sub" role="menu">
+                <div class="context-menu-item" id="open-tabs-menu-copy-title" data-call="openTabsMenuCopy" data-arg="title">Copy Title</div>
+                <div class="context-menu-item" id="open-tabs-menu-copy-url" data-call="openTabsMenuCopy" data-arg="url">Copy URL</div>
+                <div class="context-menu-item" id="open-tabs-menu-copy-url-original" hidden data-call="openTabsMenuCopy" data-arg="urlOriginal" title="The tab’s URL exactly as the browser has it. Shown only while cleaning would change it.">Copy URL (Original)</div>
+                <div class="context-menu-item" id="open-tabs-menu-copy-markdown" data-call="openTabsMenuCopy" data-arg="markdown">Copy as Markdown</div>
+            </span>
+        </div>
+        <div class="context-menu-item" id="open-tabs-menu-pin" data-call="openTabsMenuTogglePin">Pin tab</div>
+        <div class="context-menu-item" id="open-tabs-menu-mute" data-call="openTabsMenuToggleMute">Mute tab</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="open-tabs-menu-bookmark" data-call="openTabsMenuBookmark">Bookmark this tab</div>
+        <div class="context-menu-item" id="open-tabs-menu-bookmark-close" data-call="openTabsMenuBookmarkClose">Bookmark and close this tab</div>
+        <div class="context-menu-item" id="open-tabs-menu-reveal" hidden data-call="openTabsMenuReveal">Show in library</div>
+        <div class="context-menu-item" id="open-tabs-menu-obsidian" hidden data-call="openTabsMenuObsidian">Send this tab to Obsidian</div>
+        <div class="context-menu-item" id="open-tabs-menu-obsidian-close" hidden data-call="openTabsMenuObsidianClose">Send this tab to Obsidian and close it</div>
+        <div class="context-menu-item" id="open-tabs-menu-obsidian-daily" hidden data-call="openTabsMenuObsidianDaily">Send this tab to Obsidian (Daily note)</div>
+        <div class="context-menu-item" id="open-tabs-menu-obsidian-daily-close" hidden data-call="openTabsMenuObsidianDailyClose">Send this tab to Obsidian (Daily note) and close it</div>
+        <div class="context-menu-item" id="open-tabs-menu-chain-send" hidden data-call="openTabsMenuChainSend">Send search chain to Obsidian</div>
+        <div class="context-menu-item" id="open-tabs-menu-chain-send-close" hidden data-call="openTabsMenuChainSendClose">Send search chain to Obsidian and close tabs</div>
+        <div class="context-menu-item" id="open-tabs-menu-chain-bookmark" hidden data-call="openTabsMenuChainBookmark">Bookmark the search chain's tabs</div>
+        <div class="context-menu-item" id="open-tabs-menu-chain-bookmark-close" hidden data-call="openTabsMenuChainBookmarkClose">Bookmark the search chain's tabs and close them</div>
+        <div class="context-menu-separator" id="open-tabs-menu-save-sep"></div>
+        <div class="context-menu-item" id="open-tabs-menu-close" data-call="openTabsMenuClose">Close tab</div>
+        <div class="context-menu-item" id="open-tabs-menu-close-others" data-call="openTabsMenuCloseOthers">Close other tabs</div>
+        <div class="context-menu-item" id="open-tabs-menu-close-right" data-call="openTabsMenuCloseRight">Close tabs to the right</div>
+    </div>
+    <div class="context-menu" id="folder-tree-menu">
+        <div class="context-menu-stats" id="folder-tree-stats"></div>
+        <div class="context-menu-separator" id="folder-tree-stats-sep"></div>
+        <div class="context-menu-item" data-call="addFolderInClickedFolder">New Folder...</div>
+        <div class="context-menu-separator" id="folder-tree-delete-sep"></div>
+        <div class="context-menu-item" id="folder-tree-delete" data-call="deleteTreeFolder">Delete</div>
+        <div class="context-menu-item" id="folder-tree-protect" data-call="toggleTreeFolderProtection">Protect from scans</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="folder-tree-open-subreddit" hidden data-call="openFolderSubreddit" data-arg="tree">Open subreddit</div>
+        <div class="context-menu-separator" id="folder-tree-open-subreddit-sep" hidden></div>
+        <div class="context-menu-item" id="folder-tree-merge" hidden data-call="mergeTreeFolders">Merge folders</div>
+        <div class="context-menu-separator" id="folder-tree-merge-sep" hidden></div>
+        <div class="context-menu-item" data-call="sendSidebarFolderToObsidian" data-arg="keep">Send folder to Obsidian</div>
+        <div class="context-menu-item" data-call="sendSidebarFolderToObsidian" data-arg="delete">Send folder to Obsidian and delete</div>
+        <div class="context-menu-item" data-call="sendSidebarFolderToObsidianDaily" data-arg="keep" title="Append the folder to the daily note instead of inserting at the cursor">Send folder to Obsidian (Daily note)</div>
+        <div class="context-menu-item" data-call="sendSidebarFolderToObsidianDailyDelete" data-arg="delete" title="Append the folder to the daily note, then delete it">Send folder to Obsidian (Daily note) and delete</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-call="exportFolderAsHtml" data-arg="tree">Export as HTML (Netscape bookmark file)</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-call="moveLinksUnderneathFolders">Move links underneath folders</div>
+        <div class="context-menu-item" id="folder-tree-move-mobile" hidden data-call="moveMobileBookmarksToOther">Move Mobile Bookmarks into Other Bookmarks</div>
+        <div class="context-menu-item" id="folder-tree-move-toolbar-links" hidden data-call="moveToolbarLinksToOther">Move Bookmarks Toolbar links into Other Bookmarks</div>
+
+    </div>
+    <div class="context-menu" id="folder-chip-menu">
+        <div class="context-menu-stats" id="folder-chip-stats" hidden></div>
+        <div class="context-menu-separator" id="folder-chip-stats-sep" hidden></div>
+        <div class="context-menu-item" data-call="openFolderChipInLibrary">Open folder in Bookmarks</div>
+        <div class="context-menu-item" data-call="copyFolderChipPath">Copy folder path</div>
+        <div class="context-menu-item" data-call="reportFolderChip">Folder report</div>
+        <div class="context-menu-item" data-call="exportFolderChipAsJson">Export folder as JSON...</div>
+        <div class="context-menu-separator" id="folder-chip-export-sep" hidden></div>
+        <div class="context-menu-item" id="folder-chip-export" hidden data-call="exportFolderChipAsHtml">Export as HTML (Netscape bookmark file)</div>
+    </div>
+    <script src="js/bookmark-lib.js?v=goal195v1"></script>
+    <script src="js/self-tests.js?v=goalfix1"></script>
+    <script src="bookmark-editor-v1.0.js?v=goal195v1"></script>
+    <script src="js/youtube-actions.js?v=pick1"></script>
+    <script src="js/statistics.js?v=goalfix1"></script>
+    <script src="js/repairs.js?v=goalfix1"></script>
+    <script src="js/reddit-actions.js?v=pick1"></script>
+    <script src="js/meta-actions.js?v=pick1"></script>
+    <script src="js/dupe-cleanup.js?v=folder1"></script>
+    <script src="js/link-check.js?v=cross1"></script>
+    <script src="js/open-tabs.js?v=goal195v1"></script>
+    <script src="js/docs.js?v=goal195v1"></script>
+    <script src="js/ui-bind.js"></script>
+</body>
+</html>

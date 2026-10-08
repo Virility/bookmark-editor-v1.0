@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blast lab</title>
+    <link rel="stylesheet" href="blast.css?v=eight-stack3">
+</head>
+<body>
+    <div class="app">
+    <header class="titlebar">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong>Blast Lab</strong>
+    </header>
+    <div class="preset-nav">
+        <button type="button" id="preset-prev" aria-label="Previous preset">‹</button>
+        <div id="preset-name">Comic</div>
+        <button type="button" id="preset-next" aria-label="Next preset">›</button>
+        <button type="button" id="stage-rev-1">Single</button>
+        <button type="button" id="stage-rev-2">Frames</button>
+        <button type="button" id="stage-psych">Psychedelic</button>
+        <button type="button" id="des-save">Save</button>
+        <button type="button" id="des-export">Export</button>
+        <label class="file-btn">Import <input id="des-import" type="file" accept="application/json,.json"></label>
+    </div>
+    <div class="workspace" id="workspace">
+    <aside class="browser">
+        <div class="browser-search">Presets</div>
+        <h2 id="factory-head">Factory</h2>
+        <ul id="factory-list" class="preset-list"></ul>
+        <h2 id="user-head">User</h2>
+        <ul id="preset-list" class="preset-list"></ul>
+    </aside>
+    <div class="splitter" id="split-browser" title="Resize browser"></div>
+    <div class="mainview">
+    <button type="button" id="des-preview" class="stats-card heat-rev-3 blast-card stage"></button>
+    <div class="splitter splitter-row" id="split-device" title="Resize device"></div>
+    <section class="blast-designer" id="blast-designer">
+        <div class="dev-chain" id="dev-chain">
+        <article class="device host">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><button type="button" id="des-on" class="power" aria-pressed="true" aria-label="Device on"></button><strong>Blast</strong></div>
+            <div class="device-body">
+                <label>Name <input id="des-name" value="Custom"></label>
+                <label data-lfo="pattern">Pattern
+                    <select id="des-pattern">
+                        <option value="blast">Press blast</option>
+                        <option value="rev1">Revision 1</option>
+                    </select>
+                </label>
+                <label class="des-blast" data-lfo="corners">Corners
+                    <select id="des-corners">
+                        <option value="match">Same as click</option>
+                        <option value="one">One kind</option>
+                        <option value="each">Pick each corner</option>
+                        <option value="random">Random each press</option>
+                    </select>
+                </label>
+                <label class="des-blast" id="des-corner-one-label" hidden>Corner kind <select id="des-corner-one"></select></label>
+                <label class="des-blast"><input id="des-corner-loop" type="checkbox"> Continuous</label>
+                <label class="des-blast"><input id="des-inset" type="checkbox"> Inset</label>
+                <label class="des-blast" data-lfo="linkSize"><input id="des-link-size" type="checkbox" checked> Link</label>
+                <label class="des-blast" data-lfo="size">Size <input id="des-size" type="range" min="0.35" max="2.4" step="0.05" value="1"> <span id="des-size-n">1.00×</span></label>
+                <label class="des-blast" data-lfo="stack"><input id="des-stack" type="checkbox"> Stack blasts</label>
+                <label class="des-blast" id="des-overlap-label" data-lfo="overlap" hidden><input id="des-overlap" type="checkbox"> Overlap the same type</label>
+                <label class="des-blast" id="des-gap-label" data-lfo="gap" hidden>Spacing <input id="des-gap" type="range" min="120" max="2000" step="20" value="220"> <span id="des-gap-n">220ms</span></label>
+            </div>
+        </article>
+        <article class="device" data-layer="flames">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><strong>Flames</strong></div>
+            <div class="device-body">
+                <label class="des-blast" data-lfo="flamesOn"><input id="des-flames-on" type="checkbox" checked> On</label>
+                <label class="des-blast" id="des-speed-label" data-lfo="speed">Speed <input id="des-speed" type="range" min="0.25" max="2" step="0.25" value="1"> <span id="des-speed-n">1×</span></label>
+                <label class="des-blast" data-lfo="linkSpeed"><input id="des-link-speed" type="checkbox" checked> Link</label>
+                <label class="des-blast" id="des-flames-label" data-lfo="flames">Count <input id="des-flames" type="range" min="2" max="16" value="4"> <span id="des-flames-n">4</span></label>
+                <label class="des-blast" id="des-spin-label" data-lfo="spin">Spin
+                    <select id="des-spin">
+                        <option value="">Still</option>
+                        <option value="same">One way</option>
+                        <option value="alt">Alternate</option>
+                    </select>
+                </label>
+                <label class="des-blast piece-size" id="des-flame-size-label" data-lfo="flameSize">Size <input id="des-flame-size" type="range" min="0.35" max="2.4" step="0.05" value="1"></label>
+            </div>
+        </article>
+        <article class="device" data-layer="click">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><strong>Click</strong></div>
+            <div class="device-body">
+                <label class="des-blast" data-lfo="clickOn"><input id="des-click-on" type="checkbox" checked> On</label>
+                <label class="des-blast" id="des-click-label" data-lfo="click">Kind <select id="des-click"></select></label>
+                <label class="des-blast piece-size" id="des-click-size-label" data-lfo="clickSize">Size <input id="des-click-size" type="range" min="0.35" max="2.4" step="0.05" value="1"></label>
+                <label class="des-blast piece-speed" data-lfo="clickSpeed">Speed <input id="des-click-speed" type="range" min="0.25" max="2" step="0.25" value="1"> <span id="des-click-speed-n">1×</span></label>
+            </div>
+        </article>
+        <article class="device" data-layer="corner-0">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><strong>TL</strong></div>
+            <div class="device-body">
+                <label class="des-blast"><input class="corner-on" type="checkbox" checked> On</label>
+                <label class="des-blast corner-kind-label">Kind <select class="des-corner" aria-label="TL"></select></label>
+                <label class="des-blast piece-size corner-size-label" data-lfo="c0">Size <input class="corner-size" type="range" min="0.35" max="2.4" step="0.05" value="1"></label>
+                <label class="des-blast piece-speed" data-lfo="cSpeed0">Speed <input class="corner-speed" type="range" min="0.25" max="2" step="0.25" value="1"></label>
+                <label class="des-blast" data-lfo="cDelay0">Delay <input class="corner-delay" type="range" min="0" max="2000" step="50" value="500"></label>
+                <label class="des-blast"><input class="corner-stack" type="checkbox"> Stack</label>
+            </div>
+        </article>
+        <article class="device" data-layer="corner-1">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><strong>TR</strong></div>
+            <div class="device-body">
+                <label class="des-blast"><input class="corner-on" type="checkbox" checked> On</label>
+                <label class="des-blast corner-kind-label">Kind <select class="des-corner" aria-label="TR"></select></label>
+                <label class="des-blast piece-size corner-size-label" data-lfo="c1">Size <input class="corner-size" type="range" min="0.35" max="2.4" step="0.05" value="1"></label>
+                <label class="des-blast piece-speed" data-lfo="cSpeed1">Speed <input class="corner-speed" type="range" min="0.25" max="2" step="0.25" value="1"></label>
+                <label class="des-blast" data-lfo="cDelay1">Delay <input class="corner-delay" type="range" min="0" max="2000" step="50" value="500"></label>
+                <label class="des-blast"><input class="corner-stack" type="checkbox"> Stack</label>
+            </div>
+        </article>
+        <article class="device" data-layer="corner-2">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><strong>BL</strong></div>
+            <div class="device-body">
+                <label class="des-blast"><input class="corner-on" type="checkbox" checked> On</label>
+                <label class="des-blast corner-kind-label">Kind <select class="des-corner" aria-label="BL"></select></label>
+                <label class="des-blast piece-size corner-size-label" data-lfo="c2">Size <input class="corner-size" type="range" min="0.35" max="2.4" step="0.05" value="1"></label>
+                <label class="des-blast piece-speed" data-lfo="cSpeed2">Speed <input class="corner-speed" type="range" min="0.25" max="2" step="0.25" value="1"></label>
+                <label class="des-blast" data-lfo="cDelay2">Delay <input class="corner-delay" type="range" min="0" max="2000" step="50" value="500"></label>
+                <label class="des-blast"><input class="corner-stack" type="checkbox"> Stack</label>
+            </div>
+        </article>
+        <article class="device" data-layer="corner-3">
+            <div class="device-head"><button type="button" class="fold" aria-expanded="true" aria-label="Fold device"></button><strong>BR</strong></div>
+            <div class="device-body">
+                <label class="des-blast"><input class="corner-on" type="checkbox" checked> On</label>
+                <label class="des-blast corner-kind-label">Kind <select class="des-corner" aria-label="BR"></select></label>
+                <label class="des-blast piece-size corner-size-label" data-lfo="c3">Size <input class="corner-size" type="range" min="0.35" max="2.4" step="0.05" value="1"></label>
+                <label class="des-blast piece-speed" data-lfo="cSpeed3">Speed <input class="corner-speed" type="range" min="0.25" max="2" step="0.25" value="1"></label>
+                <label class="des-blast" data-lfo="cDelay3">Delay <input class="corner-delay" type="range" min="0" max="2000" step="50" value="500"></label>
+                <label class="des-blast"><input class="corner-stack" type="checkbox"> Stack</label>
+            </div>
+        </article>
+        </div>
+        <div id="lfo-rack"></div>
+    </section>
+    </div>
+    </div>
+    </div>
+    <script src="blast.js?v=eight-stack3"></script>
+</body>
+</html>
